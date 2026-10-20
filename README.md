@@ -4,7 +4,7 @@
 
 Tabe (食べ, "eat") is a mobile-first web app you install on your home screen. One instance per household, running on anything from a Raspberry Pi up.
 
-[How it's built](#under-the-hood) · [Self-host it](#self-hosting) · [API and agents](AGENTS.md) · [Report a bug](https://github.com/dfrico/menu/issues)
+[How it's built](#under-the-hood) · [Self-host it](#self-hosting) · [API and agents](AGENTS.md) · [Report a bug](https://github.com/dfrico/tabe/issues)
 
 <!-- screenshots: docs/screenshots/menu.png, dishes.png, shopping.png, nutrition.png (pending) -->
 
