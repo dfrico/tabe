@@ -1,7 +1,7 @@
 {
-  "name": "Menu",
-  "short_name": "Menu",
-  "description": "Weekly meal planner",
+  "name": "Tabe",
+  "short_name": "Tabe",
+  "description": "Weekly meal planner for households",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

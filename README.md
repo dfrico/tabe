@@ -1,4 +1,4 @@
-# menu
+# Tabe
 
 You're planning the meals for the next week or two. You have a list of dishes to choose from, and a set of things you want to eat each week. How do you find a good solution that satisfies all the requirements? A good option is using [Constraint satisfaction problem](https://en.wikipedia.org/wiki/Constraint_satisfaction_problem), or CSP.
 
@@ -43,28 +43,28 @@ On the Pi:
 
 ```sh
 curl -LsSf https://astral.sh/uv/install.sh | sh
-git init ~/menu && git -C ~/menu config receive.denyCurrentBranch updateInstead
+git init ~/tabe && git -C ~/tabe config receive.denyCurrentBranch updateInstead
 ```
 
 From your computer (assuming an SSH host alias `pi`):
 
 ```sh
-git remote add pi pi:menu
+git remote add pi pi:tabe
 git push pi main
 ```
 
 Back on the Pi:
 
 ```sh
-cd ~/menu && git checkout main
+cd ~/tabe && git checkout main
 ~/.local/bin/uv venv -p 3.12 .venv && ~/.local/bin/uv pip install -p .venv/bin/python -r requirements.txt
-sudo cp deploy/menu.service /etc/systemd/system/   # edit User/paths if they differ
-sudo systemctl enable --now menu
+sudo cp deploy/tabe.service /etc/systemd/system/   # edit User/paths if they differ
+sudo systemctl enable --now tabe
 ```
 
 The app is then at `http://<hostname>.local` (e.g. `http://dfr-pi.local`). Raspberry Pi OS announces that name on the network with Avahi; if it doesn't resolve, run `sudo apt install avahi-daemon`. If the Pi is connected by both cable and Wi-Fi, Avahi sees its own announcements and renames itself (`dfr-pi-2.local`, …): add `allow-interfaces=eth0` under `[server]` in `/etc/avahi/avahi-daemon.conf` and restart it. As a fallback, give the Pi a fixed IP in your router.
 
-To update: `git push pi <branch>` from your computer, then `ssh pi sudo systemctl restart menu` (and `uv pip install -r requirements.txt` if dependencies changed). Logs: `journalctl -u menu -f`. Your data lives in `~/menu/menu.db`; back it up with `cp`, or export dishes with `.venv/bin/python db.py export`.
+To update: `git push pi <branch>` from your computer, then `ssh pi sudo systemctl restart tabe` (and `uv pip install -r requirements.txt` if dependencies changed). Logs: `journalctl -u tabe -f`. Your data lives in `~/tabe/menu.db`; back it up with `cp`, or export dishes with `.venv/bin/python db.py export`.
 
 ### Installing it on your phone
 

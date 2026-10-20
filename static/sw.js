@@ -1,6 +1,6 @@
 // Network first, falling back to the last cached copy so the app (and the
 // last menu) still opens offline. Only active over HTTPS or on localhost.
-const CACHE = 'menu-v1';
+const CACHE = 'tabe-v1';
 const SHELL = ['/', '/styles.css', '/app.js', '/manifest.webmanifest', '/icons/icon.svg', '/api/state'];
 
 self.addEventListener('install', e => {
