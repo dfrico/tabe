@@ -112,6 +112,12 @@ def set_slot():
     return ok()
 
 
+@app.post("/api/menu/random")
+def random_slot():
+    db.random_slot(conn(), body())
+    return ok()
+
+
 @app.put("/api/menu/side")
 def set_side():
     b = body()

@@ -6,6 +6,7 @@ All notable changes to Tabe are listed here. The format follows [Keep a Changelo
 
 ### Added
 - Meals edited by hand are marked with a dot, and “New menu” can keep them and re-plan only the rest.
+- “Random” in the dish picker: the generator picks a dish for that meal and its edited mark goes away.
 - Nutrition tab: weekly goals per food group, computed from each dish's ingredients.
 - Ingredients tab: the shopping list for the planned meals, with ticks shared between phones.
 - Dish roles (full meal, combinable, side only), seasons, lunch or dinner, and multi-meal dishes with leftovers.

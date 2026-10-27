@@ -459,3 +459,41 @@ def test_keep_manual_needs_this_weeks_menu(client):
     assert not state["menu_is_current"]
     r = client.post("/api/menu/generate", json={"keep_manual": True})
     assert r.status_code == 400 and "earlier week" in r.json["error"]
+
+
+def test_random_dish_follows_rules_and_drops_the_mark(client):
+    seed(client)
+    client.post("/api/menu/generate", json={"weeks": 1})
+    sat = {"week": 1, "day": "Saturday", "meal": "Dinner"}
+    mon = {"week": 1, "day": "Monday", "meal": "Lunch"}
+    tags = {d["id"]: d for d in client.get("/api/state").json["dishes"]}
+    for _ in range(5):
+        before = {(s["week"], s["day"], s["meal"]): s["dish_id"] for s in client.get("/api/state").json["menu"]}
+        client.put("/api/menu/slot", json={**mon, "dish_id": None})
+        state = client.post("/api/menu/random", json=mon).json
+        after = {(s["week"], s["day"], s["meal"]): s for s in state["menu"]}
+        assert not after[(1, "Monday", "Lunch")]["manual"]
+        assert {k: v["dish_id"] for k, v in after.items() if k != (1, "Monday", "Lunch")} == {
+            k: v for k, v in before.items() if k != (1, "Monday", "Lunch")
+        }
+        check_rules(state)  # no repeats, different category from Monday dinner, lunch dish
+        assert tags[after[(1, "Monday", "Lunch")]["dish_id"]]["meal_time"] == "lunch"
+
+        state = client.post("/api/menu/random", json=sat).json
+        check_rules(state)  # Saturday dinner stays an egg dish
+
+    # A different dish than the current one.
+    current = after[(1, "Monday", "Lunch")]["dish_id"]
+    state = client.post("/api/menu/random", json=mon).json
+    assert next(s for s in state["menu"] if (s["day"], s["meal"]) == ("Monday", "Lunch"))["dish_id"] != current
+
+
+def test_random_dish_when_nothing_fits(client):
+    seed(client)
+    state = client.post("/api/menu/generate", json={"weeks": 1}).json
+    planned = {s["dish_id"] for s in state["menu"]}
+    for d in state["dishes"]:
+        if d["id"] not in planned:
+            client.delete(f"/api/dishes/{d['id']}")
+    r = client.post("/api/menu/random", json={"week": 1, "day": "Monday", "meal": "Lunch"})
+    assert r.status_code == 400 and "No other dish fits" in r.json["error"]

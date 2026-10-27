@@ -561,6 +561,32 @@ def set_slot(conn, slot, dish_id):
         _put(conn, slot, dish_id, side if keep_side else None, manual=True)
 
 
+def random_slot(conn, slot):
+    """Let the generator pick a meal's dish, following the menu rules around
+    the rest of the menu, and drop its "edited by hand" mark. A dish that
+    lasts 2 meals counts as one here; its leftovers aren't planned."""
+    with write(conn):
+        slot = _check_slot(conn, slot)
+        current, side = _slot_meal(conn, slot)
+        rows = conn.execute(
+            "SELECT week, day, meal, dish_id FROM menu_slots WHERE dish_id IS NOT NULL AND week <= ?",
+            (int(setting(conn, "weeks")),),
+        )
+        others = {(r["week"], r["day"], r["meal"]): r["dish_id"] for r in rows}
+        others.pop(slot, None)
+        dishes = [d._replace(portions=1) for d in plannable_dishes(conn) if d.id != current]
+        start = date.fromisoformat(setting(conn, "start_date") or _start_monday().isoformat())
+        try:
+            dish_id = menu.solve(dishes, [slot], locked=others, allowed=_allowed(conn, start))[slot]
+        except menu.MenuError:
+            raise menu.MenuError(
+                "No other dish fits this meal: it has to be in season, for "
+                f"{slot[2].lower()}, not planned elsewhere and follow the menu rules."
+            )
+        keep_side = _role(conn, dish_id) != "main" and side != dish_id
+        _put(conn, slot, dish_id, side if keep_side else None)
+
+
 def set_side(conn, slot, dish_id):
     """Set the second dish of a meal (None removes it). Neither dish can be a
     full meal (role 'main')."""

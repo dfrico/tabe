@@ -791,6 +791,7 @@ function renderPicker() {
     ? `Second dish with ${main?.name ?? '…'}`
     : slotLabel(pickerSlot);
   $('#picker-clear').hidden = sideMode || !main;
+  $('#picker-random').hidden = sideMode;
 
   const actions = [];
   if (sideMode) {
@@ -853,6 +854,14 @@ function renderPicker() {
 }
 
 $('#picker-search').addEventListener('input', renderPicker);
+// The generator picks the dish, as if planned with the menu: the meal stops
+// counting as edited by hand.
+$('#picker-random').addEventListener('click', () => {
+  const slot = pickerSlot;
+  $('#picker').close();
+  act(() => api('POST', '/api/menu/random', slot));
+});
+
 $('#picker-clear').addEventListener('click', () => {
   $('#picker').close();
   act(() => api('PUT', '/api/menu/slot', { ...pickerSlot, dish_id: null }));

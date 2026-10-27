@@ -65,6 +65,7 @@ The app runs on the home network; the examples use
 | POST | `/api/menu/generate` | `{weeks?, keep_manual?}` | Replaces the menu. `keep_manual: true` keeps meals edited by hand (`manual` in `/api/state`) and plans the rest around them; only for this week's menu (`menu_is_current`) |
 | POST | `/api/menu/swap` | `{a: slot, b: slot}` | slot = `{week, day, meal}` |
 | PUT | `/api/menu/slot` | `{week, day, meal, dish_id}` | `dish_id: null` clears. The same dish may be planned twice (leftovers). Slot, side and swap edits mark the meal `manual` |
+| POST | `/api/menu/random` | `{week, day, meal}` | The generator picks a different dish for that meal (following the rules around the rest of the menu) and clears its `manual` mark |
 | PUT | `/api/menu/side` | `{week, day, meal, dish_id}` | Second dish of a meal; neither can have role `main`. `null` removes |
 | PUT | `/api/settings` | `{weeks}` | 1 or 2; keeps week 1 when adding week 2 |
 | PUT | `/api/shopping` | `{ingredient, checked}` | Tick an ingredient as bought; `DELETE` unticks all |
