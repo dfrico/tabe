@@ -166,6 +166,16 @@ main {
 }
 .meal + .meal { border-top: 1px solid var(--border); }
 .meal-label { width: 52px; flex: none; color: var(--muted); font-size: 0.85rem; }
+/* Meals edited by hand, kept by "Keep my changes". */
+.meal-label .edited {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 4px;
+    vertical-align: middle;
+    border-radius: 50%;
+    background: var(--accent);
+}
 .dish-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .meal.empty .dish-name { color: var(--muted); font-style: italic; }
 .meal.drag-source { opacity: 0.35; }
@@ -295,6 +305,9 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 .sheet header, .sheet footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sheet footer { justify-content: flex-end; }
 .sheet footer .danger { margin-right: auto; }
+@media (max-width: 499px) {
+    .sheet footer.stacked { flex-direction: column-reverse; align-items: stretch; }
+}
 .sheet h2 { margin: 0; font-size: 1.15rem; }
 .sheet .list { overflow-y: auto; min-height: 0; flex: 1; }
 .sheet label, .field { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 0.9rem; }

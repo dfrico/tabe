@@ -170,8 +170,9 @@ function renderMenu() {
           isToday && h('span', { class: 'badge' }, 'Today')));
 
       for (const meal of state.meals) {
-        const label = h('span', { class: 'meal-label' }, meal);
         const entry = planned.get(slotKey({ week, day, meal }));
+        const label = h('span', { class: 'meal-label' }, meal,
+          entry?.manual ? h('span', { class: 'edited', title: 'Edited by hand', 'aria-label': 'edited by hand' }) : null);
         const dish = dishById.get(entry?.dish_id);
         const side = dishById.get(entry?.side_dish_id);
         dayEl.append(h('div', {
@@ -577,13 +578,33 @@ function showTab(name) {
 document.querySelectorAll('.tabbar button').forEach(b =>
   b.addEventListener('click', () => { showTab(b.dataset.tab); window.scrollTo(0, 0); }));
 
-$('#generate').addEventListener('click', async e => {
-  const button = e.currentTarget;
-  if (state.menu.length && !confirm('Replace the current menu with a new one?')) return;
-  button.disabled = true;
-  await act(() => api('POST', '/api/menu/generate', { weeks: state.weeks }), 'New menu ready');
-  button.disabled = false;
+$('#generate').addEventListener('click', () => {
+  if (!state.menu.length) return generate(false);
+  const edited = state.menu_is_current ? state.menu.filter(s => s.manual).length : 0;
+  $('#new-menu-text').textContent = edited
+    ? `Keep the ${edited === 1 ? 'meal' : `${edited} meals`} you edited (marked with a dot) and plan the rest, or start over with a whole new menu?`
+    : 'Replace the current menu with a new one?';
+  $('#new-menu-keep').hidden = !edited;
+  // With edits, keeping them is the safe choice; starting over loses them.
+  $('#new-menu-keep').classList.toggle('primary', edited > 0);
+  $('#new-menu-new').classList.toggle('primary', !edited);
+  const dialog = $('#new-menu');
+  dialog.returnValue = '';
+  dialog.showModal();
 });
+
+$('#new-menu').addEventListener('close', e => {
+  const choice = e.currentTarget.returnValue;
+  if (choice === 'new' || choice === 'keep') generate(choice === 'keep');
+});
+
+async function generate(keepManual) {
+  const button = $('#generate');
+  button.disabled = true;
+  await act(() => api('POST', '/api/menu/generate', { weeks: state.weeks, keep_manual: keepManual }),
+    keepManual ? 'Menu re-planned around your changes' : 'New menu ready');
+  button.disabled = false;
+}
 
 document.querySelectorAll('#menu-weeks button').forEach(b => b.addEventListener('click', () => {
   const weeks = Number(b.dataset.weeks);

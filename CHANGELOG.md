@@ -5,6 +5,7 @@ All notable changes to Tabe are listed here. The format follows [Keep a Changelo
 ## [Unreleased]
 
 ### Added
+- Meals edited by hand are marked with a dot, and “New menu” can keep them and re-plan only the rest.
 - Nutrition tab: weekly goals per food group, computed from each dish's ingredients.
 - Ingredients tab: the shopping list for the planned meals, with ticks shared between phones.
 - Dish roles (full meal, combinable, side only), seasons, lunch or dinner, and multi-meal dishes with leftovers.

@@ -62,9 +62,9 @@ The app runs on the home network; the examples use
 | POST | `/api/dishes` | `{name, category, role?, season?, meal_time?, portions?, tags?, ingredients?, notes?}` | `ingredients`: strings or `{name, main}` |
 | GET/PUT/DELETE | `/api/dishes/<id>` | same as POST | |
 | GET | `/api/categories`, `/api/tags`, `/api/ingredients` | | Lists of names |
-| POST | `/api/menu/generate` | `{weeks?}` | Replaces the menu |
+| POST | `/api/menu/generate` | `{weeks?, keep_manual?}` | Replaces the menu. `keep_manual: true` keeps meals edited by hand (`manual` in `/api/state`) and plans the rest around them; only for this week's menu (`menu_is_current`) |
 | POST | `/api/menu/swap` | `{a: slot, b: slot}` | slot = `{week, day, meal}` |
-| PUT | `/api/menu/slot` | `{week, day, meal, dish_id}` | `dish_id: null` clears. The same dish may be planned twice (leftovers) |
+| PUT | `/api/menu/slot` | `{week, day, meal, dish_id}` | `dish_id: null` clears. The same dish may be planned twice (leftovers). Slot, side and swap edits mark the meal `manual` |
 | PUT | `/api/menu/side` | `{week, day, meal, dish_id}` | Second dish of a meal; neither can have role `main`. `null` removes |
 | PUT | `/api/settings` | `{weeks}` | 1 or 2; keeps week 1 when adding week 2 |
 | PUT | `/api/shopping` | `{ingredient, checked}` | Tick an ingredient as bought; `DELETE` unticks all |

@@ -190,7 +190,7 @@ def test_migrates_v1_database(tmp_path, monkeypatch):
     assert state["version"] == 7
     assert state["dishes"][0]["category"] == "beef" and state["dishes"][0]["tags"] == []
     assert state["menu"] == [
-        {"week": 1, "day": "Monday", "meal": "Lunch", "dish_id": 1, "side_dish_id": None}
+        {"week": 1, "day": "Monday", "meal": "Lunch", "dish_id": 1, "side_dish_id": None, "manual": 0}
     ]
 
 
@@ -413,3 +413,49 @@ def test_migration_v7_classifies_existing_ingredients(tmp_path):
     st = db.state(db.connect(str(path)))
     assert st["ingredient_groups"] == {"merluza": "white_fish", "chorizo": "processed_meat", "xyz": None}
     assert len(st["goals"]) == len(foods.DEFAULT_GOALS)
+
+
+def test_edited_meals_are_marked_and_kept(client):
+    seed(client)
+    state = client.post("/api/menu/generate", json={"weeks": 1}).json
+    assert not any(s["manual"] for s in state["menu"])
+    assert state["menu_is_current"]
+
+    by_slot = {(s["week"], s["day"], s["meal"]): s["dish_id"] for s in state["menu"]}
+    mon_lunch = {"week": 1, "day": "Monday", "meal": "Lunch"}
+    mon_dinner = {"week": 1, "day": "Monday", "meal": "Dinner"}
+    tue_lunch = {"week": 1, "day": "Tuesday", "meal": "Lunch"}
+    wed_dinner = {"week": 1, "day": "Wednesday", "meal": "Dinner"}
+    client.put("/api/menu/slot", json={**mon_lunch, "dish_id": by_slot[(1, "Friday", "Lunch")]})
+    client.post("/api/menu/swap", json={"a": mon_dinner, "b": tue_lunch})
+    state = client.put("/api/menu/slot", json={**wed_dinner, "dish_id": None}).json  # eating out
+    edited = {(s["week"], s["day"], s["meal"]): s["dish_id"] for s in state["menu"] if s["manual"]}
+    assert set(edited) == {(1, "Monday", "Lunch"), (1, "Monday", "Dinner"), (1, "Tuesday", "Lunch"), (1, "Wednesday", "Dinner")}
+
+    client.put("/api/shopping", json={"ingredient": "rice", "checked": True})
+    for _ in range(5):
+        state = client.post("/api/menu/generate", json={"weeks": 1, "keep_manual": True}).json
+        after = {(s["week"], s["day"], s["meal"]): s for s in state["menu"]}
+        assert {k: after[k]["dish_id"] for k in edited} == edited
+        assert all(after[k]["manual"] for k in edited)
+        assert sum(s["manual"] for s in state["menu"]) == len(edited)
+        assert all(s["dish_id"] for k, s in after.items() if k in menu.plan_slots(1) and k not in edited)
+        assert state["checked"] == ["rice"]  # same week, same shopping
+        ids = [s["dish_id"] for s in state["menu"] if s["dish_id"]]
+        assert len(ids) == len(set(ids)), "a dish is used twice"
+
+    # A new menu from scratch forgets the edits.
+    state = client.post("/api/menu/generate", json={"weeks": 1}).json
+    assert not any(s["manual"] for s in state["menu"])
+
+
+def test_keep_manual_needs_this_weeks_menu(client):
+    seed(client)
+    client.post("/api/menu/generate", json={"weeks": 1})
+    conn = db.connect()
+    with db.write(conn):
+        db.set_setting(conn, "start_date", "2020-01-06")
+    state = client.get("/api/state").json
+    assert not state["menu_is_current"]
+    r = client.post("/api/menu/generate", json={"keep_manual": True})
+    assert r.status_code == 400 and "earlier week" in r.json["error"]

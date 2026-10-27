@@ -107,6 +107,12 @@ CREATE TABLE nutrition_goals (
 );
 """
 
+# v8: meals edited by hand (picked, cleared, moved), which "keep my changes"
+# leaves alone when re-planning.
+SCHEMA_V8 = """
+ALTER TABLE menu_slots ADD COLUMN manual INTEGER NOT NULL DEFAULT 0;
+"""
+
 
 def _v7_data(conn):
     """Classify existing ingredients from the built-in list; default goals."""
@@ -118,7 +124,7 @@ def _v7_data(conn):
 
 
 # Each step is SQL, or a function for data changes.
-MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, (SCHEMA_V7, _v7_data)]
+MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, (SCHEMA_V7, _v7_data), SCHEMA_V8]
 
 ROLES = ("main", "combinable", "side")
 SEASONS = ("all", "summer", "winter")
@@ -397,11 +403,11 @@ def _slot_meal(conn, slot):
     return tuple(row) if row else (None, None)
 
 
-def _put(conn, slot, dish_id, side_dish_id=None):
+def _put(conn, slot, dish_id, side_dish_id=None, manual=False):
     conn.execute(
-        """INSERT OR REPLACE INTO menu_slots (week, day, meal, dish_id, side_dish_id)
-           VALUES (?, ?, ?, ?, ?)""",
-        (*slot, dish_id, side_dish_id),
+        """INSERT OR REPLACE INTO menu_slots (week, day, meal, dish_id, side_dish_id, manual)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (*slot, dish_id, side_dish_id, int(manual)),
     )
 
 
@@ -459,7 +465,9 @@ def _start_monday(today=None):
     return monday + timedelta(weeks=1) if today.weekday() >= 5 else monday
 
 
-def generate(conn, weeks=None):
+def generate(conn, weeks=None, keep_manual=False):
+    """Plan a new menu. With keep_manual, meals edited by hand stay as they are
+    (an emptied meal stays empty) and the rest is planned around them."""
     with write(conn):
         try:
             weeks = int(weeks or setting(conn, "weeks"))
@@ -468,11 +476,30 @@ def generate(conn, weeks=None):
         if not 1 <= weeks <= config.MAX_WEEKS:
             raise ValueError(f"Weeks must be between 1 and {config.MAX_WEEKS}.")
         start = _start_monday()
-        result = menu.solve(
-            plannable_dishes(conn), menu.plan_slots(weeks), allowed=_allowed(conn, start)
-        )
-        conn.execute("DELETE FROM menu_slots")
-        conn.execute("DELETE FROM shopping_checked")  # new menu, new shopping
+        kept, to_fill = {}, menu.plan_slots(weeks)
+        if keep_manual:
+            if setting(conn, "start_date") != start.isoformat():
+                raise ValueError("This menu is from an earlier week; start a new one instead.")
+            manual = conn.execute(
+                "SELECT week, day, meal, dish_id FROM menu_slots WHERE manual = 1 AND week <= ?",
+                (weeks,),
+            ).fetchall()
+            edited = {(r["week"], r["day"], r["meal"]) for r in manual}
+            kept = {(r["week"], r["day"], r["meal"]): r["dish_id"] for r in manual if r["dish_id"]}
+            to_fill = [s for s in to_fill if s not in edited]
+        try:
+            result = menu.solve(
+                plannable_dishes(conn), to_fill, locked=kept, allowed=_allowed(conn, start)
+            )
+        except menu.MenuError as e:
+            if not kept:
+                raise
+            raise menu.MenuError(f"{e} Your edited meals may be what's in the way; try a new menu.")
+        if keep_manual:
+            conn.execute("DELETE FROM menu_slots WHERE manual = 0 OR week > ?", (weeks,))
+        else:
+            conn.execute("DELETE FROM menu_slots")
+            conn.execute("DELETE FROM shopping_checked")  # new menu, new shopping
         for slot, dish_id in result.items():
             _put(conn, slot, dish_id)
         _add_empty_slots(conn, weeks)
@@ -516,8 +543,8 @@ def swap(conn, a, b):
     with write(conn):
         a, b = _check_slot(conn, a), _check_slot(conn, b)
         meal_a, meal_b = _slot_meal(conn, a), _slot_meal(conn, b)
-        _put(conn, a, *meal_b)
-        _put(conn, b, *meal_a)
+        _put(conn, a, *meal_b, manual=True)
+        _put(conn, b, *meal_a, manual=True)
 
 
 def set_slot(conn, slot, dish_id):
@@ -528,10 +555,10 @@ def set_slot(conn, slot, dish_id):
         slot = _check_slot(conn, slot)
         _, side = _slot_meal(conn, slot)
         if dish_id is None:
-            _put(conn, slot, None, None)
+            _put(conn, slot, None, None, manual=True)
             return
         keep_side = _role(conn, dish_id) != "main" and side != dish_id
-        _put(conn, slot, dish_id, side if keep_side else None)
+        _put(conn, slot, dish_id, side if keep_side else None, manual=True)
 
 
 def set_side(conn, slot, dish_id):
@@ -547,7 +574,7 @@ def set_side(conn, slot, dish_id):
                 raise ValueError("Pick a different dish.")
             if "main" in (_role(conn, main), _role(conn, dish_id)):
                 raise ValueError("Full meals can't be combined with another dish.")
-        _put(conn, slot, main, dish_id)
+        _put(conn, slot, main, dish_id, manual=True)
 
 
 # --- Shopping ---------------------------------------------------------------
@@ -633,6 +660,8 @@ def state(conn):
             "weeks": weeks,
             "max_weeks": config.MAX_WEEKS,
             "start_date": setting(conn, "start_date") or None,
+            # "Keep my changes" only makes sense for the week being planned now.
+            "menu_is_current": setting(conn, "start_date") == _start_monday().isoformat(),
             "days": config.DAYS,
             "meals": config.MEALS,
             "category_rules": config.CATEGORY_RULES,
@@ -642,7 +671,7 @@ def state(conn):
             "menu": [
                 dict(r)
                 for r in conn.execute(
-                    "SELECT week, day, meal, dish_id, side_dish_id FROM menu_slots WHERE week <= ?",
+                    "SELECT week, day, meal, dish_id, side_dish_id, manual FROM menu_slots WHERE week <= ?",
                     (weeks,),
                 )
             ],

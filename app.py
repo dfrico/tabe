@@ -93,7 +93,8 @@ def events():
 
 @app.post("/api/menu/generate")
 def generate():
-    db.generate(conn(), body().get("weeks"))
+    b = body()
+    db.generate(conn(), b.get("weeks"), keep_manual=bool(b.get("keep_manual")))
     return ok()
 
 
